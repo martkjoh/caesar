@@ -1,7 +1,7 @@
 function test()
     x = 0
     for i in [1, 2, 3]
-        pi += i
+        x += i
     end
     print(x)
 end
