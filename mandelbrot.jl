@@ -6,12 +6,13 @@ end
 
 imRange = 2
 realRange = 2
-n = 100
+n = 5000
 m = 100
 
 x = LinRange(-2, 1, n)
 y = LinRange(-1, 1, n)
 z = Array{BigFloat}(undef, n, n)
+
 for i in 1:n
     for j in 1:n
         c = complex(x[i], y[j])
@@ -25,13 +26,14 @@ for i in 1:n
             end
         end
         z[j, i] = m - k
-
     end
-    if mod(i, n / 100) == 0
-        print(i / n * 100)
-        print()
+    if mod(i*10, n) == 0
+        print(i*100 / n, "\n")
     end
-    
 end
 
-heatmap(x, y, z)
+plt = heatmap(x, y, z)
+
+print("saving...\n")
+
+savefig(plt, "ha2.pdf")

@@ -5,8 +5,8 @@ function f(x, r)
     return r * x * (1 - x)
 end
 
-n = 1000
-m = 1000
+n = 2000
+m = 200
 rs = LinRange(2.9, 4, n)
 xs = Array{Float64}(undef, n, m)
 ys = Array{Float64}(undef, n, m)
