@@ -1,4 +1,5 @@
 using Plots
+using LinearAlgebra
 
 function trapezoid(f, a, b, n)
     dx = (b - a) / n
@@ -9,38 +10,42 @@ function trapezoid(f, a, b, n)
     return s
 end
 
-# Expands f in a basis. Returns the n first expansion coefficients
-# TODO: allow for different basis and integration schemes
-function series_expansion(f, basis, n, a, b, w = 1)
-
-    integral(f) = trapezoid(f, a, b, 1000)
-    coeff = zeros(n)
-    for i in 1:n
-        g(x) = 2 / (b - a) * f(x) * basis(i - 1, x)
-        coeff[i] = integral(g)
+function DFT(f, n, a, b)
+    k = -2pi * im * LinRange(-n, n, 2n + 1)
+    x = LinRange(a, b, n) / (b - a)
+    c = zeros(ComplexF64, 2n + 1)
+    for i in 1:2n + 1
+        for j in 1:n
+            c[i] += exp(k[i] * x[j]) * f(x[j])
+        end
+        c[i] = c[i] / n
     end
-    coeff[1] = coeff[1] / 2
-    return coeff
+    return c
 end
 
-a = -1
-b = 1
-n = 10000
-m = 50
-x = Vector(LinRange(a, b, n))
+function main()
+    a = -2
+    b = 3
+    n = 100
+    m = 10
+    x = Vector(LinRange(a, b, n))
 
-f(x) = x^3 + x + 1
-basis(n, x) = cos(n * 2pi * x / (b - a))
-c = series_expansion(f, basis, m, a, b)
+    f(x) = x^3 + x^2 - x 
+    c = DFT(f, n, a, b)
 
-for k in 1:m
-    a = zeros(n)
-    for i in 1:k
-        a += c[i] * basis.(i - 1, x)
-        # a += c[m + i] * basis.(-n + i - 1, -x)
+    for i in 1:m
+        d = ones(n) * c[n + 1]
+        for j in 1:i
+            d += c[n - j + 1] * exp.(2pi*im * (-j)*x/(b - a))
+            d += c[n + j + 1] * exp.(2pi*im * j*x/(b - a))
+        end
+        print(c[n + i + 1], '\n')
+
+        plot(x, f.(x))
+        plot!(x, real(d))
+        plot!(show = true)
+        sleep(0.5)
     end
-
-    plot(x, [f.(x), a])
-    plot!(show = true)
-    # sleep(0.01)
 end
+
+main()
