@@ -16,9 +16,8 @@ function DFT(f, n, a, b)
     c = zeros(ComplexF64, 2n + 1)
     for i in 1:2n + 1
         for j in 1:n
-            c[i] += exp(k[i] * x[j]) * f(x[j])
+            c[i] += exp(k[i] * x[j]) * f[j] / n
         end
-        c[i] = c[i] / n
     end
     return c
 end
@@ -26,12 +25,12 @@ end
 function main()
     a = -2
     b = 3
-    n = 100
-    m = 10
+    n = 1000
+    m = 40
     x = Vector(LinRange(a, b, n))
 
     f(x) = x^3 + x^2 - x 
-    c = DFT(f, n, a, b)
+    c = DFT(f.(x), n, a, b)
 
     for i in 1:m
         d = ones(n) * c[n + 1]
@@ -39,12 +38,11 @@ function main()
             d += c[n - j + 1] * exp.(2pi*im * (-j)*x/(b - a))
             d += c[n + j + 1] * exp.(2pi*im * j*x/(b - a))
         end
-        print(c[n + i + 1], '\n')
 
         plot(x, f.(x))
         plot!(x, real(d))
         plot!(show = true)
-        sleep(0.5)
+        sleep(0.45)
     end
 end
 
