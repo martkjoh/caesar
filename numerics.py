@@ -1,41 +1,32 @@
 import numpy as np
 from numpy import pi, exp
 from matplotlib import pyplot as plt
+import time 
 
 def trapeziod(f, n, a, b):
     x = np.linspace(a, b, n + 1)
     fx = f(x)
     return np.sum((fx[:-1] + fx[1:])) / 2 * (b - a) / n
 
+# Returns array with fourier coeff for freq j at index n + j,
+# i.e. f(x) ~ sum_j=n^-n c[n+j]e^(i2pi * j x/(b - a)) 
 def DFT(f, n, a, b):
-    k = -2j * pi * np.linspace(-n, n, 2*n + 1)
-    x = np.linspace(a, b, n) / (b - a)
-    c = np.zeros(2*n + 1).astype(np.complex64)
-    for i in range(2*n + 1):
-        for j in range(n):
-            c[i] += exp(k[i] * x[j]) * f[j] / n
-    return c
-    # return exp(np.outer(k, x)) @ f / n
+    k = -2j*pi/(b - a) * np.linspace(-n, n, 2*n + 1, dtype = np.complex64)
+    x = np.linspace(a, b, n, dtype = np.complex64)
+    fx = f(x)
+    return exp(np.outer(k, x)) @ fx / n
 
 def f(x):
     return x**3 + x**2 - x 
 
 a = -2
 b = 3
-n = 1000
-m = 10
-x = np.linspace(a, b, n)
+n = range(100, 5000, 100)
+t = np.empty(len(n))
+for i in range(len(n)):
+    t[i] = time.time()
+    c = DFT(f, n[i], a, b)
+    t[i] = time.time() - t[i]
 
-plt.plot(x, f(x))
-c = DFT(f(x), n, a, b)
-
-for i in range(10):
-    s = c[n] * np.ones(n, dtype = np.complex64)
-    for j in range(1, i):
-        s += c[n - j] * exp(2j*pi*(-j)*x / (b - a))
-        s += c[n + j] * exp(2j*pi*j*x / (b - a))
-    print(c[n + i])
-
-    plt.plot(x, f(x))
-    plt.plot(x, s.real)
-    plt.show()
+plt.plot(n, t)
+plt.savefig("t(n)_DFT_Python.png")

@@ -10,40 +10,31 @@ function trapezoid(f, a, b, n)
     return s
 end
 
+# Returns array with fourier coeff for freq j at index n + j + 1,
+# i.e. f(x) ~ sum_j=n^-n c[n+j+1]e^(i2pi * j x/(b - a)) 
 function DFT(f, n, a, b)
-    k = -2pi * im * LinRange(-n, n, 2n + 1)
-    x = LinRange(a, b, n) / (b - a)
+    k = -2pi*im/(b - a) * LinRange{Float32}(-n, n, 2n + 1)
+    x = LinRange{Float32}(a, b, n)
+    fx = f.(x)
     c = zeros(ComplexF64, 2n + 1)
     for i in 1:2n + 1
         for j in 1:n
-            c[i] += exp(k[i] * x[j]) * f[j] / n
+            c[i] += exp(k[i] * x[j]) * fx[j] / n
         end
     end
     return c
 end
 
-function main()
-    a = -2
-    b = 3
-    n = 1000
-    m = 40
-    x = Vector(LinRange(a, b, n))
+f(x) = x^3 + x^2 - x 
 
-    f(x) = x^3 + x^2 - x 
-    c = DFT(f.(x), n, a, b)
+n = 100:100:5000
+t = zeros(length(n))
+a = -2
+b = 3
 
-    for i in 1:m
-        d = ones(n) * c[n + 1]
-        for j in 1:i
-            d += c[n - j + 1] * exp.(2pi*im * (-j)*x/(b - a))
-            d += c[n + j + 1] * exp.(2pi*im * j*x/(b - a))
-        end
-
-        plot(x, f.(x))
-        plot!(x, real(d))
-        plot!(show = true)
-        sleep(0.45)
-    end
+for i in 1:length(n)
+    t[i] = @elapsed DFT(f, n[i], a, b)
 end
 
-main()
+plot(n, t)
+savefig("t(n)_DFT_Julia")
