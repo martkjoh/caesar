@@ -2,6 +2,26 @@ using Random
 using Plots
 using DelimitedFiles
 
+
+# Parametres
+equib = 100_000
+n = 1_000_000
+dir = "ising-mod-data/"
+Tc = 2 / (log(1 + sqrt(2)))
+
+# number of different tempratures to simulate
+temps = 81
+Ts = LinRange(0.4*Tc, 1.4*Tc, temps)
+# Ts[31] = Tc
+# The different sizes of the grid to simutale
+Ns = [2, 4, 8, 12, 16, 20]
+sizes, = size(Ns)
+
+names_obs = ["energy",  "abs_mag", "energy_squared", "abs_mag_squared", "fraction"]
+names_func = ["tension", "heat_cap", "susc"]
+num_quant, = size(names_obs)
+
+
 # Utillities
 # Small functions needed throught the program
 
@@ -26,8 +46,6 @@ end
 
 # Physics
 
-Tc = 2.26
-
 function get_delta_H(s, i, j, N)
     return 2*s[i, j] * sum_neigh(s, i, j, N)
 end
@@ -39,15 +57,38 @@ function energy(s, N)
             E += -1/2 * s[i, j] * sum_neigh(s, i, j, N)
         end
     end
-    return E/N^2
+    return E
 end
 
+
+ 
 function abs_mag(s, N)
-    return abs(sum(s)) / N^2
+    return abs(sum(s))
+end
+
+
+function fraction(s, N, T)
+    diff_H = 2*sum(s[end, :].*s[1, :])
+    return exp(-diff_H/T)
+end
+
+function tension(frac, N, T)
+    return -T/N * log(frac)
+end
+
+function heat_cap(E, E2, N, T)
+    return (E2 - E^2) / T^2 * N^2
+end
+
+function susc(M, M2, N, T)
+    return (M2 - M^2) / T * N^2
+end
+
+function analytic_mag(Ts)
+    return (1 - sinh(2/ Ts)^(-4))^(1 / 8)
 end
 
 # Monte Carlo simulation
-
 
 function MC_sweep!(s, N, T)
     for _ in 1:N^2
@@ -63,39 +104,45 @@ function MC_sweep!(s, N, T)
     end
 end
 
+function get_sample_from_stat(s, N, T)
+    observables = Array{Float64}(undef, (size(names_obs)[1]))
+    observables[1] = energy(s, N)/ (N^2)
+    observables[2] = abs_mag(s, N) / N^2
+    observables[3] = observables[1]^2
+    observables[4] = observables[2]^2
+    observables[5] = fraction(s, N, T)
+
+    return observables
+end
+
 
 function get_samples(N, T, n, equib)
     s = get_s(N)
-    M = E = M2 = E2 = 0
+    observables = zeros(size(names_obs)[1])
     for i in 1:equib
         MC_sweep!(s, N, T)
     end
     for i in 1:n
         MC_sweep!(s, N, T)
-        Ei = energy(s, N)
-        Mi = abs_mag(s, N)
-        E += Ei
-        E2 += Ei^2
-        M += Mi
-        M2 += Mi^2
+        observables += get_sample_from_stat(s, N, T)
     end
-    return [E, E2, M, M2] / n
+    return observables / n
 end
 
 
-function write_data(data, num_quant, names, dir)
+function write_data(data, num_quant, names_obs, dir)
     for i in 1:num_quant
-        path = dir * names[i] * ".csv"
+        path = dir * names_obs[i] * ".csv"
         file = open(path, "w")
         writedlm(file, data[i, :, :], ",")
         close(file)
     end
 end
 
-function read_data(num_quant, sizes, temps, names, dir)
+function read_data(num_quant, sizes, temps, names_obs, dir)
     data  = Array{Float64}(undef, (num_quant, sizes, temps))
     for i in 1:num_quant
-        path = dir * names[i] * ".csv"
+        path = dir * names_obs[i] * ".csv"
         data[i, :, :] = readdlm(path, ',', Float64, '\n')
     end
     return data
@@ -120,52 +167,114 @@ function plot_equibliration()
 end
 
 
-function main()
-    equib = 10_000
-    n = 1_000
-    dir = "ising-mod-data/"
+function sample_observables()
+    data  = Array{Float64}(undef, (num_quant, sizes, temps))
+    steps = sizes * temps
+    for i in eachindex(Ns)
+        for j in eachindex(Ts)
+            N = Ns[i]; T = Ts[j]
+            data[:, i, j] = get_samples(N, T, n, equib)
 
-    # number of different tempratures to simulate
-    temps = 10
-    Ts = LinRange(1.5, 1.5*Tc, temps)
-    # The different sizes of the grid to simutale
-    Ns = [8, 16, 32, 64]
-    sizes, = size(Ns)
-
-    names = ["energy", "energy_squared", "abs_mag", "abs_mag_squared"]
-    num_quant, = size(names)
-
-    function sample_observables()
-        data  = Array{Float64}(undef, (num_quant, sizes, temps))
-        steps = sizes * temps
-        for i in eachindex(Ns)
-            for j in eachindex(Ts)
-                N = Ns[i]; T = Ts[j]
-                data[:, i, j] = get_samples(N, T, n, equib)
-
-                print(ceil(((i-1)*temps+j)/steps * 100), "%\n")
-            end
-        end    
-        write_data(data, num_quant, names, dir)
-    end
-
-    function plot_observables()
-        data = read_data(num_quant, sizes, temps, names, dir)
-
-        for i in eachindex(names)
-            p = plot()
-            for j in eachindex(Ns)
-                plot!(Ts, data[i, j, :], marker=:dot, label=string(Ns[j]))
-            end
-            plot!(title=names[i])
-            savefig(dir * names[i] * ".png")
+            print(ceil(((i-1)*temps+j)/steps * 100), "%\n")
         end
     end
-
-    # sample_observables()
-    plot_observables()
+    write_data(data, num_quant, names_obs, dir)
 end
 
+function plot_observables()
+    data = read_data(num_quant, sizes, temps, names_obs, dir)
 
+    for i in eachindex(names_obs)
+        p = plot()
+        for j in eachindex(Ns)
+            plot!(Ts, data[i, j, :], 
+            marker=:circle, label=string(Ns[j]))
+        end
 
-main()
+        if i == 2
+            T = LinRange(Ts[1], Tc, 500) 
+            plot!(T, analytic_mag.(T),
+            linewidth=3, linestyle=:dash, linecolor=:black) 
+        end
+
+        lim = [minimum(data[i, :, :]), maximum(data[i, :, :])]
+        plot!([Tc, Tc], lim, label="\$T_c\$")
+        plot!(title=names_obs[i])
+        savefig(dir * names_obs[i] * ".png")
+    end
+end
+
+function plot_tension()
+    data = read_data(num_quant, sizes, temps, names_obs, dir)
+    p = plot()
+    for j in eachindex(Ns)
+        tau = tension.(data[5, j, :], Ns[j], Ts)
+        plot!(Ts, tau, marker=:dot, label=string(Ns[j]))
+    end
+
+    plot!([Tc, Tc], [0, 2])
+    plot!(title=names_func[1])
+    savefig(dir * names_func[1] * ".png")
+
+end
+
+function plot_heat_cap()
+    data = read_data(num_quant, sizes, temps, names_obs, dir)
+    p = plot()
+    for j in eachindex(Ns)
+        tau = heat_cap.(data[1, j, :], data[3, j, :], Ns[j], Ts)
+        plot!(Ts, tau, marker=:dot, label=string(Ns[j]))
+    end
+    
+    
+    plot!([Tc, Tc], [0, 2], label="\$T_c\$")
+    plot!(title=names_func[2])
+    savefig(dir * names_func[2] * ".png")
+end
+
+function plot_susc()
+    data = read_data(num_quant, sizes, temps, names_obs, dir)
+    p = plot()
+    for j in eachindex(Ns)
+        tau = heat_cap.(data[2, j, :], data[4, j, :], Ns[j], Ts)
+        plot!(Ts, tau, marker=:dot, label=string(Ns[j]))
+    end
+    plot!([Tc, Tc], [0, 4], label="\$T_c\$")
+    plot!(title=names_func[3])
+    savefig(dir * names_func[3] * ".png")
+end
+
+function more_plots()
+    data = read_data(num_quant, sizes, temps, names_obs, dir)
+    p = plot(size=(1000, 500))
+
+    ts = (Tc .- Ts)./Ts
+    m = 49
+    for i in 1:sizes
+        tau = tension.(data[5, i, m], Ns[i], Ts[m])
+        plot!([Ns[i],], [tau,], marker=:dot, label=string(Ns[i]))
+    end
+    x = LinRange(log(2), log(20), 100)
+    plot!(exp.(x), exp.(-x .+ 0.75),  xaxis=:log, yaxis=:log)
+    plot!(title=string(Ts[m]))
+    savefig(dir * "p1" * ".png")
+    closeall()
+
+    p = plot()
+    indx = 40:48
+    for i in indx
+        t = ts[i]
+        tau = tension.(data[5, :, i], Ns, Ts[i])
+        plot!( (Ns .* t), tau ./ t, label=string(t), yaxis=:log, xaxis=:log)
+    end
+    
+    plot!(legend=:topright)
+    savefig(dir * "p2" * ".png")
+end
+
+# sample_observables()
+plot_observables()
+plot_tension()
+plot_heat_cap()
+plot_susc()
+more_plots()
