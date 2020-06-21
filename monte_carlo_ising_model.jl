@@ -265,16 +265,18 @@ function more_plots()
     for i in indx
         t = ts[i]
         tau = tension.(data[5, :, i], Ns, Ts[i])
-        plot!( (Ns .* t), tau ./ t, label=string(t), yaxis=:log, xaxis=:log)
+        plot!( 1 ./ (Ns .* t), tau ./ t, label=string(t))
     end
     
-    plot!(legend=:topright)
+    x = LinRange(0, 40, 100)
+    plot!(x, 2 .*x, linestyle=:dash, linecolor=:black)
+    plot!(legend=:bottomright)
     savefig(dir * "p2" * ".png")
 end
 
 # sample_observables()
-plot_observables()
-plot_tension()
-plot_heat_cap()
-plot_susc()
+# plot_observables()
+# plot_tension()
+# plot_heat_cap()
+# plot_susc()
 more_plots()
